@@ -2,22 +2,51 @@
 interface MediaItem {
   src: string
   type: 'image' | 'video'
+  key?: string
 }
 
-const mediaItems: MediaItem[] = [
-  { src: '/photos/IMG_E1637.JPG', type: 'image' },
-  { src: '/photos/IMG_E1641.JPG', type: 'image' },
-  { src: '/photos/067207d7-c731-4bb9-b9c5-79b9a6caa463.jpg', type: 'image' },
-  { src: '/photos/d967ee9c-8b77-4013-affc-e919db2e6287.jpg', type: 'image' }
-]
+// Fetch S3 photos only
+const { data: s3Photos } = await useFetch<MediaItem[]>('/api/photos', {
+  default: () => []
+})
 
-// Separate items for the carousel (all items as carousel entries)
-const carouselItems = mediaItems
+const carouselItems = computed(() => s3Photos.value || [])
+
+// Modal state
+const modalOpen = ref(false)
+const modalSrc = ref('')
+
+const openModal = (src: string) => {
+  modalSrc.value = src
+  modalOpen.value = true
+}
+
+const closeModal = () => {
+  modalOpen.value = false
+  modalSrc.value = ''
+}
+
+// Close on Escape
+if (import.meta.client) {
+  onMounted(() => {
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeModal()
+    })
+  })
+}
 </script>
 
 <template>
   <div>
+    <!-- Empty state -->
+    <div v-if="carouselItems.length === 0" class="text-center py-12 text-pink-300 opacity-60">
+      <p class="text-4xl mb-3">📷</p>
+      <p class="text-sm">Удахгүй зурагнууд нэмэгдэнэ...</p>
+    </div>
+
+    <!-- Carousel -->
     <UCarousel
+      v-else
       v-slot="{ item }"
       loop
       arrows
@@ -40,6 +69,7 @@ const carouselItems = mediaItems
         <div
           v-if="item.type === 'image'"
           class="relative overflow-hidden rounded-2xl gallery-card group cursor-pointer"
+          @click="openModal(item.src)"
         >
           <img
             :src="item.src"
@@ -48,6 +78,10 @@ const carouselItems = mediaItems
             loading="lazy"
           >
           <div class="absolute inset-0 bg-linear-to-t from-pink-900/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          <!-- Zoom hint -->
+          <div class="absolute bottom-3 right-3 bg-white/20 backdrop-blur-sm text-white text-xs px-2.5 py-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+            🔍 Томруулах
+          </div>
         </div>
 
         <!-- Video -->
@@ -66,13 +100,34 @@ const carouselItems = mediaItems
           >
             Таны хөтөч видео тоглуулахыг дэмждэггүй.
           </video>
-          <!-- Video badge -->
           <div class="absolute top-3 right-3 bg-pink-500/80 text-white text-xs px-2.5 py-1 rounded-full backdrop-blur-sm font-semibold pointer-events-none">
             🎬 Видео
           </div>
         </div>
       </div>
     </UCarousel>
+
+    <!-- Fullscreen Modal -->
+    <Teleport to="body">
+      <Transition name="modal-fade">
+        <div
+          v-if="modalOpen"
+          class="modal-overlay"
+          @click.self="closeModal"
+        >
+          <div class="modal-content">
+            <button class="modal-close" @click="closeModal">
+              ✕
+            </button>
+            <img
+              :src="modalSrc"
+              alt="Зураг"
+              class="modal-img"
+            >
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -86,5 +141,70 @@ const carouselItems = mediaItems
 .gallery-card:hover {
   border-color: rgba(244, 114, 182, 0.25);
   box-shadow: 0 16px 40px rgba(219, 112, 147, 0.15);
+}
+
+/* ── Modal ── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.modal-content {
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+}
+
+.modal-img {
+  max-width: 90vw;
+  max-height: 85vh;
+  object-fit: contain;
+  border-radius: 12px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+}
+
+.modal-close {
+  position: absolute;
+  top: -16px;
+  right: -16px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  z-index: 10;
+}
+
+.modal-close:hover {
+  background: rgba(239, 68, 68, 0.6);
+  transform: scale(1.1);
+}
+
+/* ── Transition ── */
+.modal-fade-enter-active {
+  transition: opacity 0.25s ease;
+}
+.modal-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.modal-fade-enter-from,
+.modal-fade-leave-to {
+  opacity: 0;
 }
 </style>
