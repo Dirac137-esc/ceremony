@@ -5,9 +5,10 @@ interface MediaItem {
   key?: string
 }
 
-// Fetch S3 photos only
+// Fetch S3 photos — client-side to always get fresh data (page is prerendered)
 const { data: s3Photos } = await useFetch<MediaItem[]>('/api/photos', {
-  default: () => []
+  default: () => [],
+  server: false
 })
 
 const carouselItems = computed(() => s3Photos.value || [])
