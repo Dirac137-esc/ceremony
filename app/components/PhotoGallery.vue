@@ -12,25 +12,43 @@ const { data: s3Photos } = await useFetch<MediaItem[]>('/api/photos', {
 
 const carouselItems = computed(() => s3Photos.value || [])
 
+// Only image items for modal navigation
+const imageItems = computed(() => carouselItems.value.filter(i => i.type === 'image'))
+
 // Modal state
 const modalOpen = ref(false)
-const modalSrc = ref('')
+const modalIndex = ref(0)
+
+const modalSrc = computed(() => imageItems.value[modalIndex.value]?.src || '')
 
 const openModal = (src: string) => {
-  modalSrc.value = src
+  const idx = imageItems.value.findIndex(i => i.src === src)
+  modalIndex.value = idx >= 0 ? idx : 0
   modalOpen.value = true
 }
 
 const closeModal = () => {
   modalOpen.value = false
-  modalSrc.value = ''
 }
 
-// Close on Escape
+const prevPhoto = () => {
+  if (imageItems.value.length <= 1) return
+  modalIndex.value = (modalIndex.value - 1 + imageItems.value.length) % imageItems.value.length
+}
+
+const nextPhoto = () => {
+  if (imageItems.value.length <= 1) return
+  modalIndex.value = (modalIndex.value + 1) % imageItems.value.length
+}
+
+// Keyboard navigation
 if (import.meta.client) {
   onMounted(() => {
     document.addEventListener('keydown', (e) => {
+      if (!modalOpen.value) return
       if (e.key === 'Escape') closeModal()
+      if (e.key === 'ArrowLeft') prevPhoto()
+      if (e.key === 'ArrowRight') nextPhoto()
     })
   })
 }
@@ -115,6 +133,15 @@ if (import.meta.client) {
           class="modal-overlay"
           @click.self="closeModal"
         >
+          <!-- Prev Arrow -->
+          <button
+            v-if="imageItems.length > 1"
+            class="modal-arrow modal-arrow-left"
+            @click="prevPhoto"
+          >
+            ‹
+          </button>
+
           <div class="modal-content">
             <button class="modal-close" @click="closeModal">
               ✕
@@ -124,7 +151,20 @@ if (import.meta.client) {
               alt="Зураг"
               class="modal-img"
             >
+            <!-- Counter -->
+            <div class="modal-counter">
+              {{ modalIndex + 1 }} / {{ imageItems.length }}
+            </div>
           </div>
+
+          <!-- Next Arrow -->
+          <button
+            v-if="imageItems.length > 1"
+            class="modal-arrow modal-arrow-right"
+            @click="nextPhoto"
+          >
+            ›
+          </button>
         </div>
       </Transition>
     </Teleport>
@@ -148,7 +188,7 @@ if (import.meta.client) {
   position: fixed;
   inset: 0;
   z-index: 9999;
-  background: rgba(0, 0, 0, 0.85);
+  background: rgba(0, 0, 0, 0.88);
   backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
@@ -158,13 +198,13 @@ if (import.meta.client) {
 
 .modal-content {
   position: relative;
-  max-width: 90vw;
+  max-width: 85vw;
   max-height: 90vh;
 }
 
 .modal-img {
-  max-width: 90vw;
-  max-height: 85vh;
+  max-width: 85vw;
+  max-height: 82vh;
   object-fit: contain;
   border-radius: 12px;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
@@ -196,6 +236,57 @@ if (import.meta.client) {
   transform: scale(1.1);
 }
 
+/* ── Arrows ── */
+.modal-arrow {
+  position: fixed;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: white;
+  font-size: 2rem;
+  font-weight: 300;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  z-index: 10000;
+  line-height: 1;
+  padding-bottom: 3px;
+}
+
+.modal-arrow:hover {
+  background: rgba(255, 255, 255, 0.22);
+  transform: translateY(-50%) scale(1.1);
+}
+
+.modal-arrow:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+.modal-arrow-left {
+  left: 16px;
+}
+
+.modal-arrow-right {
+  right: 16px;
+}
+
+/* ── Counter ── */
+.modal-counter {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.8rem;
+  margin-top: 12px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+}
+
 /* ── Transition ── */
 .modal-fade-enter-active {
   transition: opacity 0.25s ease;
@@ -206,5 +297,30 @@ if (import.meta.client) {
 .modal-fade-enter-from,
 .modal-fade-leave-to {
   opacity: 0;
+}
+
+/* ── Mobile ── */
+@media (max-width: 640px) {
+  .modal-arrow {
+    width: 40px;
+    height: 40px;
+    font-size: 1.5rem;
+  }
+
+  .modal-arrow-left {
+    left: 8px;
+  }
+
+  .modal-arrow-right {
+    right: 8px;
+  }
+
+  .modal-content {
+    max-width: 92vw;
+  }
+
+  .modal-img {
+    max-width: 92vw;
+  }
 }
 </style>

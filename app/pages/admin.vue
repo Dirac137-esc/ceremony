@@ -461,7 +461,7 @@ watch(authenticated, (val) => {
             <input
               ref="fileInput"
               type="file"
-              accept="image/jpeg,image/png,image/gif,image/webp"
+              accept="image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif,.heic,.heif"
               multiple
               class="hidden"
               @change="handleFileSelect"

@@ -1,3 +1,4 @@
+import convert from 'heic-convert'
 import { uploadPhotoToS3 } from '../utils/s3'
 
 export default defineEventHandler(async (event) => {
@@ -19,23 +20,45 @@ export default defineEventHandler(async (event) => {
       })
     }
 
-    const imageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic']
+    const imageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif']
+    const heicTypes = ['image/heic', 'image/heif']
     const results = []
 
     for (const part of formData) {
       if (!part.filename || !part.data) continue
 
-      const mimetype = part.type || 'application/octet-stream'
+      let mimetype = part.type || 'application/octet-stream'
+      let buffer: Buffer = Buffer.from(part.data)
+      let filename = part.filename
+
+      // Detect HEIC by file extension (some devices send wrong mimetype)
+      const ext = filename.toLowerCase().split('.').pop() || ''
+      if (ext === 'heic' || ext === 'heif') {
+        mimetype = 'image/heic'
+      }
+
       if (!imageTypes.includes(mimetype)) continue
 
-      const result = await uploadPhotoToS3(part.data, part.filename, mimetype)
+      // Convert HEIC/HEIF to JPEG using heic-convert
+      if (heicTypes.includes(mimetype)) {
+        const outputBuffer = await convert({
+          buffer: buffer,
+          format: 'JPEG',
+          quality: 0.9
+        })
+        buffer = Buffer.from(outputBuffer)
+        mimetype = 'image/jpeg'
+        filename = filename.replace(/\.(heic|heif)$/i, '.jpg')
+      }
+
+      const result = await uploadPhotoToS3(buffer, filename, mimetype)
       results.push(result)
     }
 
     if (results.length === 0) {
       throw createError({
         statusCode: 400,
-        message: 'Зөвхөн зургийн файл (JPG, PNG, GIF, WEBP) хүлээн авна'
+        message: 'Зөвхөн зургийн файл (JPG, PNG, GIF, WEBP, HEIC) хүлээн авна'
       })
     }
 
