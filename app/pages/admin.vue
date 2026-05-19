@@ -173,10 +173,20 @@ const handleFileSelect = async (event: Event) => {
 }
 
 const deletingKey = ref('')
+const confirmDeleteKey = ref('')
 
-const deletePhoto = async (key: string) => {
-  if (!confirm('Энэ зургийг устгах уу?')) return
+const askDelete = (key: string) => {
+  confirmDeleteKey.value = key
+}
 
+const cancelDelete = () => {
+  confirmDeleteKey.value = ''
+}
+
+const confirmDelete = async () => {
+  const key = confirmDeleteKey.value
+  if (!key) return
+  confirmDeleteKey.value = ''
   deletingKey.value = key
   try {
     await $fetch('/api/photos', {
@@ -503,19 +513,19 @@ watch(authenticated, (val) => {
             <div
               v-for="photo in photos"
               :key="photo.key"
-              class="relative glass-card-strong rounded-2xl overflow-hidden group"
+              class="relative glass-card-strong rounded-2xl overflow-hidden"
             >
               <img
                 :src="photo.src"
                 :alt="photo.key"
-                class="w-full h-48 object-cover transition-transform duration-500 group-hover:scale-110"
+                class="w-full h-48 object-cover"
                 loading="lazy"
               >
-              <!-- Delete button -->
+              <!-- Delete button (always visible) -->
               <button
-                class="absolute top-2 right-2 w-8 h-8 rounded-full bg-red-500/80 hover:bg-red-600 text-white text-sm font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 backdrop-blur-sm shadow-lg"
+                class="absolute top-2 right-2 w-8 h-8 rounded-full bg-red-500 hover:bg-red-600 text-white text-sm font-bold flex items-center justify-center shadow-lg transition-all duration-200 active:scale-90"
                 :disabled="deletingKey === photo.key"
-                @click="deletePhoto(photo.key)"
+                @click="askDelete(photo.key)"
               >
                 <span v-if="deletingKey === photo.key" class="upload-spinner" style="width:14px;height:14px;" />
                 <span v-else>✕</span>
@@ -525,24 +535,53 @@ watch(authenticated, (val) => {
         </div>
       </div>
     </div>
+
+    <!-- Delete Confirmation Modal -->
+    <Teleport to="body">
+      <Transition name="confirm-fade">
+        <div v-if="confirmDeleteKey" class="confirm-overlay" @click.self="cancelDelete">
+          <div class="confirm-card">
+            <div class="text-center">
+              <div class="text-4xl mb-3">🗑️</div>
+              <h3 class="text-lg font-bold text-pink-800 mb-2">Зураг устгах</h3>
+              <p class="text-sm text-pink-500 mb-6">Энэ зургийг устгахдаа итгэлтэй байна уу?</p>
+            </div>
+            <div class="flex gap-3">
+              <button class="confirm-btn confirm-btn-cancel" @click="cancelDelete">
+                Болих
+              </button>
+              <button class="confirm-btn confirm-btn-delete" @click="confirmDelete">
+                Устгах
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
 <style scoped>
-/* ── PIN Screen (dark theme for security feel) ── */
+/* ── PIN Screen (matching main page pink/light theme) ── */
 .admin-page .pin-screen {
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 20px;
-  background: linear-gradient(160deg, #1a0a1e 0%, #2d1535 50%, #1a0a1e 100%);
+  background: linear-gradient(180deg, #FFF5F7 0%, #FFE4EC 30%, #FECDD3 60%, #FFF5F7 100%);
 }
 
 .pin-card {
   text-align: center;
   max-width: 340px;
   width: 100%;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(244, 114, 182, 0.15);
+  border-radius: 28px;
+  padding: 40px 32px;
+  box-shadow: 0 16px 48px rgba(219, 112, 147, 0.12);
 }
 
 .pin-icon {
@@ -559,14 +598,18 @@ watch(authenticated, (val) => {
 .pin-title {
   font-size: 1.8rem;
   font-weight: 700;
-  color: #f9a8d4;
+  background: linear-gradient(135deg, #BE185D, #EC4899);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   margin: 0 0 4px;
   font-family: 'Cormorant Garamond', serif;
 }
 
 .pin-subtitle {
   font-size: 0.9rem;
-  color: #d4a0b9;
+  color: #9D174D;
+  opacity: 0.6;
   margin: 0 0 32px;
 }
 
@@ -593,15 +636,15 @@ watch(authenticated, (val) => {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  border: 2px solid #9b5e7a;
+  border: 2px solid rgba(244, 114, 182, 0.3);
   background: transparent;
   transition: all 0.2s ease;
 }
 
 .pin-dot.filled {
-  background: #f472b6;
-  border-color: #f472b6;
-  box-shadow: 0 0 12px rgba(244, 114, 182, 0.4);
+  background: #EC4899;
+  border-color: #EC4899;
+  box-shadow: 0 0 12px rgba(236, 72, 153, 0.35);
 }
 
 .pin-dot.error {
@@ -632,8 +675,8 @@ watch(authenticated, (val) => {
   height: 76px;
   border-radius: 50%;
   border: 1.5px solid rgba(244, 114, 182, 0.2);
-  background: rgba(244, 114, 182, 0.06);
-  color: #fce7f3;
+  background: rgba(255, 255, 255, 0.6);
+  color: #9D174D;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -641,31 +684,35 @@ watch(authenticated, (val) => {
   cursor: pointer;
   transition: all 0.2s ease;
   -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 2px 8px rgba(219, 112, 147, 0.08);
 }
 
 .dial-btn:active:not(:disabled) {
   transform: scale(0.92);
-  background: rgba(244, 114, 182, 0.2);
-  border-color: rgba(244, 114, 182, 0.5);
+  background: rgba(244, 114, 182, 0.15);
+  border-color: rgba(244, 114, 182, 0.4);
 }
 
 .dial-btn:hover:not(:disabled) {
-  background: rgba(244, 114, 182, 0.12);
+  background: rgba(244, 114, 182, 0.08);
   border-color: rgba(244, 114, 182, 0.35);
+  box-shadow: 0 4px 16px rgba(219, 112, 147, 0.15);
 }
 
 .dial-btn-empty {
   opacity: 0;
   cursor: default;
+  box-shadow: none;
 }
 
 .dial-btn-delete {
   border-color: rgba(239, 68, 68, 0.2);
-  background: rgba(239, 68, 68, 0.06);
+  background: rgba(254, 226, 226, 0.5);
+  color: #DC2626;
 }
 
 .dial-btn-delete:hover:not(:disabled) {
-  background: rgba(239, 68, 68, 0.12);
+  background: rgba(254, 226, 226, 0.8);
   border-color: rgba(239, 68, 68, 0.35);
 }
 
@@ -678,7 +725,8 @@ watch(authenticated, (val) => {
 .dial-letters {
   font-size: 0.55rem;
   letter-spacing: 0.15em;
-  color: #d4a0b9;
+  color: #DB2777;
+  opacity: 0.5;
   margin-top: 2px;
 }
 
@@ -701,6 +749,78 @@ watch(authenticated, (val) => {
   display: none;
 }
 
+/* ── Confirmation Modal ── */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.confirm-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(244, 114, 182, 0.15);
+  border-radius: 24px;
+  padding: 32px;
+  max-width: 320px;
+  width: 100%;
+  box-shadow: 0 24px 64px rgba(219, 112, 147, 0.2);
+}
+
+.confirm-btn {
+  flex: 1;
+  padding: 12px 20px;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.confirm-btn-cancel {
+  background: rgba(244, 114, 182, 0.08);
+  color: #9D174D;
+  border: 1px solid rgba(244, 114, 182, 0.2);
+}
+
+.confirm-btn-cancel:hover {
+  background: rgba(244, 114, 182, 0.15);
+}
+
+.confirm-btn-delete {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);
+}
+
+.confirm-btn-delete:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.35);
+}
+
+.confirm-btn-delete:active {
+  transform: scale(0.97);
+}
+
+/* Confirm transition */
+.confirm-fade-enter-active {
+  transition: opacity 0.2s ease;
+}
+.confirm-fade-leave-active {
+  transition: opacity 0.15s ease;
+}
+.confirm-fade-enter-from,
+.confirm-fade-leave-to {
+  opacity: 0;
+}
+
 /* ── Responsive dial ── */
 @media (max-width: 480px) {
   .dial-btn {
@@ -715,6 +835,10 @@ watch(authenticated, (val) => {
   .dial-row {
     gap: 16px;
     margin-bottom: 12px;
+  }
+
+  .pin-card {
+    padding: 32px 24px;
   }
 }
 </style>
